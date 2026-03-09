@@ -8,13 +8,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'db.json');
 
-// Database Setup
 async function initDB() {
-    try {
-        if (!await fs.pathExists(DB_FILE)) {
-            await fs.writeJson(DB_FILE, { users: [], orders: [] });
-        }
-    } catch (err) { console.error("DB Error:", err); }
+    if (!await fs.pathExists(DB_FILE)) {
+        await fs.writeJson(DB_FILE, { users: [], orders: [] });
+    }
 }
 initDB();
 
@@ -23,20 +20,19 @@ const saveData = async (data) => await fs.writeJson(DB_FILE, data, { spaces: 2 }
 
 app.use(cors());
 app.use(bodyParser.json());
-
-// Serving the PUBLIC folder. 
-// Because index.html is inside /public, Express will find it automatically at '/'
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- AUTHENTICATION ---
+// --- AUTH ---
 app.post('/api/register', async (req, res) => {
     const { name, phone } = req.body;
     const data = await getData();
-    const cleanPhone = phone.trim();
-    if (data.users.find(u => u.phone === cleanPhone)) {
-        return res.status(400).json({ error: "Phone number already exists!" });
-    }
-    const newUser = { name: name.trim(), phone: cleanPhone };
+    // Validation: 10 digits and full name
+    if (!name || name.trim().split(' ').length < 2) return res.status(400).json({ error: "Please enter your Full Name (First and Last)." });
+    if (!/^\d{10}$/.test(phone)) return res.status(400).json({ error: "Phone must be exactly 10 digits." });
+    
+    if (data.users.find(u => u.phone === phone.trim())) return res.status(400).json({ error: "Phone already registered!" });
+    
+    const newUser = { name: name.trim(), phone: phone.trim() };
     data.users.push(newUser);
     await saveData(data);
     res.status(201).json({ user: newUser });
@@ -46,7 +42,7 @@ app.post('/api/login', async (req, res) => {
     const data = await getData();
     const user = data.users.find(u => u.phone === req.body.phone.trim());
     if (user) res.json({ user });
-    else res.status(401).json({ error: "User not found. Please Register." });
+    else res.status(401).json({ error: "Credentials not found. Please register exactly as before." });
 });
 
 // --- ORDERS ---
@@ -54,8 +50,6 @@ app.post('/api/orders', async (req, res) => {
     const { phone, itemName, price } = req.body;
     const data = await getData();
     const user = data.users.find(u => u.phone === phone.trim());
-    if (!user) return res.status(403).json({ error: "Forbidden" });
-
     const newOrder = { 
         id: Date.now(), 
         customerName: user.name, 
@@ -63,7 +57,7 @@ app.post('/api/orders', async (req, res) => {
         itemName, 
         price, 
         status: 'pending', 
-        timestamp: new Date().toLocaleString('en-GB') 
+        timestamp: new Date().toLocaleString() 
     };
     data.orders.unshift(newOrder);
     await saveData(data);
@@ -75,7 +69,7 @@ app.get('/api/my-orders/:phone', async (req, res) => {
     res.json(data.orders.filter(o => o.customerPhone === req.params.phone));
 });
 
-// --- ADMIN ---
+// --- ADMIN ACTIONS (The Fix for your Buttons) ---
 app.post('/api/admin/verify', async (req, res) => {
     if (req.body.password === "G1234") {
         const data = await getData();
@@ -85,12 +79,13 @@ app.post('/api/admin/verify', async (req, res) => {
 
 app.patch('/api/orders/:id/status', async (req, res) => {
     const data = await getData();
-    const order = data.orders.find(o => o.id === parseInt(req.params.id));
-    if (order) {
-        order.status = req.body.status;
+    const index = data.orders.findIndex(o => o.id === parseInt(req.params.id));
+    if (index !== -1) {
+        data.orders[index].status = req.body.status;
         await saveData(data);
-        res.json({ success: true });
-    } else res.status(404).send();
+        return res.json({ success: true });
+    }
+    res.status(404).json({ error: "Order not found" });
 });
 
 app.delete('/api/orders/:id', async (req, res) => {
@@ -100,4 +95,4 @@ app.delete('/api/orders/:id', async (req, res) => {
     res.json({ success: true });
 });
 
-app.listen(PORT, () => console.log(`🚀 VoltEdge live on Port ${PORT}`));
+app.listen(PORT, () => console.log(`VoltEdge System Online`));
