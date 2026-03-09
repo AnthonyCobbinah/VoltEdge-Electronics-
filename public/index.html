@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoltEdge Electronics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .hardware-img { width: 100%; height: 160px; object-fit: contain; }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans" x-data="voltEdgeApp()" x-init="init()">
+
+    <div x-show="toast.show" x-cloak class="fixed top-5 left-1/2 -translate-x-1/2 z-[200] bg-violet-600 text-white px-8 py-3 rounded-full shadow-2xl font-bold" x-text="toast.msg"></div>
+
+    <nav class="bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-2">
+            <span class="bg-violet-600 px-2 py-1 rounded font-black text-xs">VE</span>
+            <h2 class="text-xl font-black italic uppercase">VoltEdge</h2>
+        </div>
+        <div class="flex gap-4">
+            <template x-if="user"><button @click="logout()" class="text-[10px] font-bold text-red-400">LOGOUT</button></template>
+            <button @click="showAdminModal = true" class="text-[10px] bg-violet-600 px-3 py-1 rounded font-bold uppercase">Admin</button>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <div x-show="!user && view === 'shop'" class="max-w-md mx-auto mt-12 bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-200">
+            <div class="flex gap-4 mb-8">
+                <button @click="authMode = 'login'" :class="authMode === 'login' ? 'text-violet-600 border-b-2 border-violet-600' : 'text-slate-300'" class="flex-1 pb-2 font-bold uppercase text-xs">Login</button>
+                <button @click="authMode = 'register'" :class="authMode === 'register' ? 'text-violet-600 border-b-2 border-violet-600' : 'text-slate-300'" class="flex-1 pb-2 font-bold uppercase text-xs">Register</button>
+            </div>
+            <div class="space-y-4">
+                <div x-show="authMode === 'register'">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Full Name</label>
+                    <input type="text" x-model="authForm.name" class="w-full bg-slate-50 border-2 p-3 rounded-xl outline-none focus:border-violet-600 font-bold">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Phone (10 Digits)</label>
+                    <input type="tel" x-model="authForm.phone" placeholder="024XXXXXXX" class="w-full bg-slate-50 border-2 p-3 rounded-xl outline-none focus:border-violet-600 font-bold">
+                </div>
+                <button @click="handleAuth()" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold uppercase hover:bg-violet-600 transition-all" x-text="authMode === 'register' ? 'Create Account' : 'Access Shop'"></button>
+            </div>
+        </div>
+
+        <div x-show="user && view === 'shop'" x-cloak class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div class="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <template x-for="item in products">
+                    <div class="bg-white p-6 rounded-[2rem] border shadow-sm hover:shadow-xl transition-all text-center">
+                        <div class="h-40 flex items-center justify-center mb-4">
+                            <img :src="encodeURIComponent(item.image)" class="hardware-img" onerror="this.src='https://placehold.co/200x160?text=Part'">
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-sm mb-1" x-text="item.name"></h3>
+                        <p class="text-violet-600 font-black text-lg mb-4" x-text="'GH₵ ' + item.price"></p>
+                        <button @click="placeOrder(item)" class="w-full bg-slate-900 text-white py-3 rounded-xl text-xs font-bold hover:bg-violet-600">ORDER NOW</button>
+                    </div>
+                </template>
+            </div>
+
+            <div class="lg:col-span-1 bg-white p-6 rounded-[2rem] border shadow-sm h-fit">
+                <h2 class="font-bold text-slate-900 mb-6 text-xs uppercase border-b pb-2">My Orders</h2>
+                <div class="space-y-4">
+                    <template x-for="o in myOrders" :key="o.id">
+                        <div class="p-4 rounded-xl border bg-slate-50">
+                            <p class="text-[10px] font-bold uppercase mb-2" x-text="o.itemName"></p>
+                            <span x-show="o.status === 'pending'" class="text-[8px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold uppercase">Pending</span>
+                            <span x-show="o.status === 'confirmed'" class="text-[8px] bg-green-500 text-white px-2 py-0.5 rounded font-bold uppercase">Confirmed</span>
+                            <span x-show="o.status === 'out-of-stock'" class="text-[8px] bg-red-600 text-white px-2 py-0.5 rounded font-bold uppercase">No Stock</span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="view === 'admin'" x-cloak class="max-w-6xl mx-auto">
+            <div class="bg-white rounded-[2rem] shadow-2xl border-4 border-violet-600 overflow-hidden">
+                <div class="bg-violet-600 p-6 text-white flex justify-between items-center">
+                    <h2 class="text-2xl font-black italic uppercase">Admin View</h2>
+                    <button @click="view = 'shop'" class="bg-white text-violet-600 px-4 py-1 rounded-lg font-bold text-xs">EXIT</button>
+                </div>
+                <table class="w-full text-left">
+                    <tr class="bg-violet-50 text-violet-900 text-[10px] font-bold uppercase border-b">
+                        <th class="p-6">Customer</th>
+                        <th class="p-6">Order</th>
+                        <th class="p-6 text-center">Status Action</th>
+                    </tr>
+                    <template x-for="o in allOrders" :key="o.id">
+                        <tr class="border-b hover:bg-slate-50">
+                            <td class="p-6">
+                                <div class="font-black text-lg text-slate-900 uppercase" x-text="o.customerName"></div>
+                                <div class="font-bold text-violet-600 text-sm" x-text="o.customerPhone"></div>
+                            </td>
+                            <td class="p-6">
+                                <div class="font-bold text-xs" x-text="o.itemName"></div>
+                                <div class="text-[10px] text-slate-400" x-text="o.timestamp"></div>
+                            </td>
+                            <td class="p-6 text-center space-x-1">
+                                <button @click="updateStatus(o.id, 'confirmed')" class="bg-green-500 text-white px-2 py-1 rounded text-[9px] font-bold uppercase">Confirm</button>
+                                <button @click="updateStatus(o.id, 'out-of-stock')" class="bg-orange-500 text-white px-2 py-1 rounded text-[9px] font-bold uppercase">Out Stock</button>
+                                <button @click="deleteOrder(o.id)" class="bg-red-600 text-white px-2 py-1 rounded text-[9px] font-bold uppercase">Del</button>
+                            </td>
+                        </tr>
+                    </template>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showAdminModal" x-cloak class="fixed inset-0 bg-slate-900/90 flex items-center justify-center p-4 z-[100]">
+        <div class="bg-white p-8 rounded-2xl w-full max-w-sm text-center">
+            <h3 class="font-bold mb-4 uppercase">Admin Access</h3>
+            <input type="password" x-model="adminPassInput" class="w-full border-2 p-3 rounded-xl mb-4 text-center font-bold outline-none focus:border-violet-600">
+            <div class="flex gap-2">
+                <button @click="showAdminModal = false" class="flex-1 bg-slate-100 py-3 rounded-xl font-bold uppercase">Cancel</button>
+                <button @click="adminLogin()" class="flex-1 bg-violet-600 text-white py-3 rounded-xl font-bold uppercase">Verify</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function voltEdgeApp() {
+            return {
+                view: 'shop', authMode: 'login', user: null,
+                authForm: {name: '', phone: ''},
+                showAdminModal: false, adminPassInput: '',
+                myOrders: [], allOrders: [],
+                toast: {show: false, msg: ''},
+                products: [
+                    {name:'HP Pavilion 15 Motherboard', price:1100, image: 'HP-Pavilion-15.jpg'},
+                    {name:'256GB SSD', price:250, image: 'ssd-256.jpg'},
+                    {name:'512GB SSD', price:450, image: 'ssd-512.jpg'},
+                    {name:'HP Envy laptop battery', price:380, image: 'HP-Envy-laptop-battery.jpg'},
+                    {name:'1TB HDD', price:400, image: 'hdd-1tb.jpg'},
+                    {name:'DIY Kit', price:290, image: 'diy-electronic-kit.jpg'},
+                    {name:'Dell Vostro N411Z Battery', price:350, image: 'Dell Vostro N411Z battry.jpg'}
+                ],
+                init() {
+                    const session = localStorage.getItem('voltEdgeSession');
+                    if(session) { this.user = JSON.parse(session); this.loadOrders(); }
+                    setInterval(() => this.loadOrders(), 5000);
+                },
+                triggerToast(msg) {
+                    this.toast.msg = msg; this.toast.show = true;
+                    setTimeout(() => this.toast.show = false, 3000);
+                },
+                async handleAuth() {
+                    if (this.authMode === 'register') {
+                        if (this.authForm.name.trim().length < 3) return alert("Please enter Full Name.");
+                        if (!/^\d{10}$/.test(this.authForm.phone)) return alert("Please enter 10-digit Phone.");
+                    }
+                    const res = await fetch(`/api/${this.authMode}`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(this.authForm)
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        this.user = data.user;
+                        localStorage.setItem('voltEdgeSession', JSON.stringify(this.user));
+                        this.loadOrders();
+                    } else alert(data.error);
+                },
+                async loadOrders() {
+                    if(!this.user) return;
+                    const res = await fetch(`/api/my-orders/${this.user.phone}`);
+                    if(res.ok) this.myOrders = await res.json();
+                    if(this.view === 'admin') this.adminFetch();
+                },
+                async adminFetch() {
+                    const res = await fetch('/api/admin/verify', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ password: 'G1234' })
+                    });
+                    const data = await res.json();
+                    if(data.success) this.allOrders = data.orders;
+                },
+                async placeOrder(item) {
+                    const res = await fetch('/api/orders', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ phone: this.user.phone, itemName: item.name, price: item.price })
+                    });
+                    if (res.ok) { this.triggerToast("Order Placed Successfully! ✅"); this.loadOrders(); }
+                },
+                async updateStatus(id, status) {
+                    await fetch(`/api/orders/${id}/status`, {
+                        method: 'PATCH',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ status })
+                    });
+                    this.adminFetch();
+                },
+                async deleteOrder(id) {
+                    if(confirm("Permanently delete order?")) {
+                        await fetch(`/api/orders/${id}`, { method: 'DELETE' });
+                        this.adminFetch();
+                    }
+                },
+                adminLogin() {
+                    if(this.adminPassInput === 'G1234') { this.view = 'admin'; this.showAdminModal = false; this.adminFetch(); }
+                    else alert("Wrong Admin Password");
+                },
+                logout() { localStorage.removeItem('voltEdgeSession'); location.reload(); }
+            }
+        }
+    </script>
+</body>
+</html>
